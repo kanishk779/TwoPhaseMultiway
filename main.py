@@ -1,5 +1,5 @@
 import sys
-import re
+import heapq
 from collections import OrderedDict
 
 
@@ -58,7 +58,7 @@ class TwoPhaseSort:
         :param index: used for naming the current file by adding index as suffix
         :return: nothing
         """
-        file_name = "temp" + str(index)
+        file_name = "temp" + str(index) + '.txt'
         curr_file = open(file_name, 'w')
         total_columns = len(self.info_file)
         start = True
@@ -120,6 +120,32 @@ class TwoPhaseSort:
                 self.write_temp_file(self.temp_file_count + 1)
                 processed_size = self.record_size
             self.write_one_row(row)
+
+    def append_output(self):
+        """
+        appends the output_file with the buffer data
+        :return:
+        """
+
+    def phase_two(self):
+        not_processed = [1] * self.temp_file_count
+        temp_files = {}
+        temp_list = []
+
+        for i in range(1, self.temp_file_count + 1):
+            temp_files[i] = open('temp' + str(i) + '.txt', 'r')
+            first_line = temp_files[i].readline().strip()
+            # create a new tuple by appending the index of this file
+            first_list = list(first_line)
+            first_list.append(str(i))
+            first_line = tuple(first_list)
+            temp_list.append(first_line)
+
+        heapq.heapify(temp_list)
+
+        while(any(not_processed)):
+
+
 
 
 
