@@ -37,6 +37,20 @@ class TwoPhaseSort:
                 col_size = int(data[1].strip())
                 self.info_file[col_name] = col_size
 
+    def fill_column_list(self):
+        """
+        Fills the column_list which contains the indices representing the order in which sorting should take place
+        :return: nothing
+        """
+        ind = 0
+        temp = OrderedDict()
+        for key in self.info_file.keys():
+            if key in self.column_name_list:
+                temp[key] = ind
+            ind += 1
+        for name in self.column_name_list:
+            self.column_list.append(temp[name])
+
     def write_temp_file(self, index):
         """
         It writes the current sorted buffer into a temporary file, and clears the buffer for future operations.
