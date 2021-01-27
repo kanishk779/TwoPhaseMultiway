@@ -11,6 +11,10 @@ class TwoPhaseSort:
         self.column_list = column_list
         self.main_memory = main_memory
         self.buffer = []  # this is used to keep the unsorted data chunk for writing to temp files
+        self.temp_file_count = 0
+        self.record_size = 0
+        self.meta_info()
+        self.calc_record_size()
 
     def meta_info(self):
         """
@@ -54,4 +58,21 @@ class TwoPhaseSort:
                     curr_file.write(str(data) + ", ")
                 i += 1
         self.buffer.clear()
-        
+        self.temp_file_count += 1
+
+    def calc_record_size(self):
+        temp_sum = 0
+        for key, val in self.info_file.items():
+            temp_sum += val
+        self.record_size = temp_sum
+
+    def phase_one(self):
+        """
+        Phase one sorts the data by dividing it into chunks, and write them back to disk
+        :return: nothing
+        """
+        read_file = open(self.input_file, 'r')
+        for row in read_file.readlines():
+            pass
+
+
