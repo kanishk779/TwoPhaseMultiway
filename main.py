@@ -4,17 +4,19 @@ from collections import OrderedDict
 
 
 class TwoPhaseSort:
-    def __init__(self, input_file, output, column_list, main_memory, descending):
+    def __init__(self, input_file, output, column_name_list, main_memory, descending):
         self.info_file = OrderedDict()
         self.input_file = input_file
         self.output_file = output
-        self.column_list = column_list
+        self.column_name_list = column_name_list  # list of names which represent the order of columns
+        self.column_list = []  # list of numbers(indices) which represent the order of columns
         self.main_memory = main_memory
         self.descending = descending
         self.buffer = []  # this is used to keep the unsorted data chunk for writing to temp files
         self.temp_file_count = 0
         self.record_size = 0
         self.meta_info()
+        self.fill_column_list()
         self.calc_record_size()
 
     def meta_info(self):
@@ -63,10 +65,30 @@ class TwoPhaseSort:
         self.temp_file_count += 1
 
     def calc_record_size(self):
+        """
+        calculates the record size i.e tuple size of the relation
+        :return: nothing
+        """
         temp_sum = 0
         for key, val in self.info_file.items():
             temp_sum += val
         self.record_size = temp_sum
+
+    def write_one_row(self, row):
+        """
+        Fills one row in the buffer in the column order specified by column list
+        :param row:
+        :return:
+        """
+        temp = []
+        for ind in self.column_list:
+            temp.append(row[ind])
+        total_columns = len(self.info_file)
+        for i in range(total_columns):
+            if i not in self.column_list:
+                temp.append(row[i])
+        temp = tuple(temp)
+        self.buffer.append(temp)
 
     def phase_one(self):
         """
