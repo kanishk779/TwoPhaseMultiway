@@ -4,12 +4,13 @@ from collections import OrderedDict
 
 
 class TwoPhaseSort:
-    def __init__(self, input_file, output, column_list, main_memory):
+    def __init__(self, input_file, output, column_list, main_memory, descending):
         self.info_file = OrderedDict()
         self.input_file = input_file
         self.output_file = output
         self.column_list = column_list
         self.main_memory = main_memory
+        self.descending = descending
         self.buffer = []  # this is used to keep the unsorted data chunk for writing to temp files
         self.temp_file_count = 0
         self.record_size = 0
@@ -36,7 +37,8 @@ class TwoPhaseSort:
 
     def write_temp_file(self, index):
         """
-        It writes the current sorted buffer into a temporary file, and clears the buffer for future operations
+        It writes the current sorted buffer into a temporary file, and clears the buffer for future operations.
+        The files are name beginning from 1, i.e temp1, temp2, ....... tempN.
         :param index: used for naming the current file by adding index as suffix
         :return: nothing
         """
@@ -72,7 +74,16 @@ class TwoPhaseSort:
         :return: nothing
         """
         read_file = open(self.input_file, 'r')
+        processed_size = 0
         for row in read_file.readlines():
-            pass
+            processed_size += self.record_size
+            if processed_size > self.main_memory:
+                self.buffer.sort()
+                if self.descending:
+                    self.buffer.reverse()
+                self.write_temp_file(self.temp_file_count + 1)
+                processed_size = self.record_size
+            self.write_one_row(row)
+
 
 
