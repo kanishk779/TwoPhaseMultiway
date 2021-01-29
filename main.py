@@ -186,22 +186,14 @@ class TwoPhaseSort:
         :param row: a string
         :return:
         """
-        ind = 0
-        row_list = []
-        for sz in self.new_col_sizes:
-            row_list.append(row[ind: ind + sz])
-            ind += 2
-        temp = []
-        for ind in self.column_list:
-            temp.append(row_list[ind])
-        total_columns = len(self.info_file)
-        for i in range(total_columns):
-            if i not in self.column_list:
-                temp.append(row_list[i])
-        temp = tuple(temp)
+        temp = tuple(row)
         self.buffer.append(temp)
 
     def phase_two(self):
+        """
+        Phase two of two phase multi-way merge-sort
+        :return: nothing
+        """
         not_processed = [1] * self.temp_file_count
         temp_files = {}
         temp_list = []
@@ -210,12 +202,11 @@ class TwoPhaseSort:
             temp_files[i] = open('temp' + str(i) + '.txt', 'r')
             first_line = temp_files[i].readline().strip()
             # create a new tuple by appending the index of this file
-            first_list = list(first_line)
+            first_list = first_line.split("  ")  # split the line
             first_list.append(str(i))
             first_line = tuple(first_list)
             temp_list.append(first_line)
 
-        # Remember to close the files
         heapq.heapify(temp_list)
         written_size = 0
         while any(not_processed):
@@ -225,4 +216,19 @@ class TwoPhaseSort:
                 self.append_output()
                 written_size = self.record_size
             #  write the record to the output file, read records will be in the new order
+            self.write_one_row_phase_two(top)
+            file_num = int(top[-1])
+            new_line = temp_files[file_num].readline()
+            if new_line:
+                new_line = new_line.strip()
+                new_list = new_line.split("  ")
+                new_list.append(str(file_num))
+                new_line = tuple(new_list)
+                heapq.heappush(temp_list, new_line)
+            else:
+                not_processed[file_num - 1] = 0
+
+        # Remember to close the files
+        for i in range(1, self.temp_file_count + 1):
+            temp_files[i].close()
 
