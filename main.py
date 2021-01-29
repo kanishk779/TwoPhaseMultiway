@@ -15,6 +15,7 @@ class TwoPhaseSort:
         self.descending = descending
         self.buffer = []  # this is used to keep the unsorted data chunk for writing to temp files
         self.col_sizes = []
+        self.new_col_sizes = []  # after the reordering of columns is completed
         self.temp_file_count = 0
         self.record_size = 0
         self.meta_info()
@@ -77,7 +78,7 @@ class TwoPhaseSort:
                 if i == total_columns - 1:
                     curr_file.write(str(data))
                 else:
-                    curr_file.write(str(data) + ", ")
+                    curr_file.write(str(data) + "  ")
                 i += 1
         self.buffer.clear()
         self.temp_file_count += 1
@@ -115,6 +116,27 @@ class TwoPhaseSort:
         temp = tuple(temp)
         self.buffer.append(temp)
 
+    # TODO: Complete this function
+    def reorder_columns(self):
+        """
+        reorder the columns sizes, for further help in processing
+        :return:
+        """
+        new_order = OrderedDict()
+        j = 0
+        for ind in self.column_list:
+            new_order[j] = ind
+            j += 1
+
+        total_columns = len(self.info_file)
+
+        for i in range(total_columns):
+            if i not in self.column_list:
+                new_order[j] = i
+                j += 1
+        for key, val in new_order.items():
+            self.new_col_sizes.append(self.col_sizes[val])
+
     def phase_one(self):
         """
         Phase one sorts the data by dividing it into chunks, and write them back to disk, readlines() should not be used
@@ -138,7 +160,6 @@ class TwoPhaseSort:
 
         read_file.close()
 
-    # TODO: use set if inbuilt sort is not allowed
     def append_output(self):
         """
         appends the output_file with the buffer data
@@ -151,12 +172,34 @@ class TwoPhaseSort:
             for data in row:
                 data = data.strip()
                 if i < total_columns - 1:
-                    write_file.write(data + ", ")
+                    write_file.write(data + "  ")
                 else:
                     write_file.write(data)
             write_file.write('\n')
             i += 1
         write_file.close()
+
+    def write_one_row_phase_two(self, row):
+        """
+        Fills one row in the buffer in the column order specified by column list. We change the column order in this
+        function
+        :param row: a string
+        :return:
+        """
+        ind = 0
+        row_list = []
+        for sz in self.new_col_sizes:
+            row_list.append(row[ind: ind + sz])
+            ind += 2
+        temp = []
+        for ind in self.column_list:
+            temp.append(row_list[ind])
+        total_columns = len(self.info_file)
+        for i in range(total_columns):
+            if i not in self.column_list:
+                temp.append(row_list[i])
+        temp = tuple(temp)
+        self.buffer.append(temp)
 
     def phase_two(self):
         not_processed = [1] * self.temp_file_count
@@ -176,4 +219,10 @@ class TwoPhaseSort:
         heapq.heapify(temp_list)
         written_size = 0
         while any(not_processed):
-            pass
+            top = heapq.heappop(temp_list)
+            written_size += self.record_size
+            if written_size > self.main_memory:
+                self.append_output()
+                written_size = self.record_size
+            #  write the record to the output file, read records will be in the new order
+
