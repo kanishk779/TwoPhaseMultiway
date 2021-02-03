@@ -232,3 +232,6 @@ class TwoPhaseSort:
         for i in range(1, self.temp_file_count + 1):
             temp_files[i].close()
 
+
+def main():
+    print("hello")
