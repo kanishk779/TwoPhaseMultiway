@@ -5,10 +5,10 @@ from collections import OrderedDict
 
 
 class TwoPhaseSort:
-    def __init__(self, input_file, output, column_name_list, main_memory, descending):
+    def __init__(self, input_file, output_file, column_name_list, main_memory, descending):
         self.info_file = OrderedDict()
         self.input_file = input_file
-        self.output_file = output
+        self.output_file = output_file
         self.column_name_list = column_name_list  # list of names which represent the order of columns
         self.column_list = []  # list of numbers(indices) which represent the order of columns
         self.main_memory = main_memory
@@ -40,6 +40,8 @@ class TwoPhaseSort:
                 col_size = int(data[1].strip())
                 self.info_file[col_name] = col_size
                 self.col_sizes.append(col_size)
+            print("column sizes : ", end='')
+            print(self.col_sizes)
             meta_file.close()
 
     def fill_column_list(self):
@@ -55,6 +57,7 @@ class TwoPhaseSort:
             ind += 1
         for name in self.column_name_list:
             self.column_list.append(temp[name])
+        print(self.column_list)
 
     def write_temp_file(self, index):
         """
@@ -63,6 +66,7 @@ class TwoPhaseSort:
         :param index: used for naming the current file by adding index as suffix
         :return: nothing
         """
+        print("writing temp file")
         file_name = "temp" + str(index) + '.txt'
         curr_file = open(file_name, 'w')
         total_columns = len(self.info_file)
@@ -71,8 +75,9 @@ class TwoPhaseSort:
             raise NotImplementedError("The buffer size is 0, cannot write to disk")
         for row in self.buffer:
             if start:
-                curr_file.write("\n")
                 start = False
+            else:
+                curr_file.write("\n")
             i = 0
             for data in row:
                 if i == total_columns - 1:
@@ -93,6 +98,7 @@ class TwoPhaseSort:
         for key, val in self.info_file.items():
             temp_sum += val
         self.record_size = temp_sum
+        print(self.record_size)
 
     def write_one_row(self, row):
         """
@@ -105,7 +111,8 @@ class TwoPhaseSort:
         row_list = []
         for sz in self.col_sizes:
             row_list.append(row[ind: ind + sz])
-            ind += 2
+            ind += sz + 2
+        print(row_list)
         temp = []
         for ind in self.column_list:
             temp.append(row_list[ind])
@@ -114,6 +121,7 @@ class TwoPhaseSort:
             if i not in self.column_list:
                 temp.append(row_list[i])
         temp = tuple(temp)
+        print(temp)
         self.buffer.append(temp)
 
     # TODO: Complete this function
@@ -158,6 +166,10 @@ class TwoPhaseSort:
                 processed_size = self.record_size
             self.write_one_row(row)  # write into buffer
 
+        self.buffer.sort()
+        if self.descending:
+            self.buffer.reverse()
+        self.write_temp_file(self.temp_file_count + 1)
         read_file.close()
 
     def append_output(self):
@@ -165,6 +177,7 @@ class TwoPhaseSort:
         appends the output_file with the buffer data
         :return: nothing
         """
+        print("append file")
         write_file = open(self.output_file, 'a')
         total_columns = len(self.info_file)
         i = 0
@@ -216,7 +229,7 @@ class TwoPhaseSort:
                 self.append_output()
                 written_size = self.record_size
             #  write the record to the output file, read records will be in the new order
-            self.write_one_row_phase_two(top)
+            self.write_one_row_phase_two(tuple(top[:-1]))
             file_num = int(top[-1])
             new_line = temp_files[file_num].readline()
             if new_line:
@@ -234,4 +247,26 @@ class TwoPhaseSort:
 
 
 def main():
-    print("hello")
+    arg_count = len(sys.argv)
+    if arg_count < 5:
+        print("Usage : python3 main.py input.txt output.txt 50 asc c1 c2")
+        raise NotImplementedError("Number of arguments are not correct")
+    input_file = str(sys.argv[1]).strip()
+    output_file = str(sys.argv[2]).strip()
+    main_memory = int(str(sys.argv[3]).strip())
+    sorting_type = str(sys.argv[4]).strip()
+    column_list = []
+    for i in range(5, arg_count):
+        column_list.append(str(sys.argv[i]).strip())
+    desc = False
+    if sorting_type == "desc":
+        desc = True
+    two_phase = TwoPhaseSort(input_file=input_file, output_file=output_file, column_name_list=column_list,
+                             descending=desc, main_memory=main_memory)
+
+    two_phase.phase_one()
+    two_phase.phase_two()
+
+
+if __name__ == '__main__':
+    main()
