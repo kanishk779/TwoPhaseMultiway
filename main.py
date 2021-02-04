@@ -29,7 +29,7 @@ class TwoPhaseSort:
         Reads the metadata.txt file to read in the schema of the table containing the records.
         """
         try:
-            meta_file = open('metadata.txt', 'r')
+            meta_file = open('metadata1.txt', 'r')
         except FileNotFoundError:
             print('metadata.txt not found')
         else:
@@ -184,7 +184,7 @@ class TwoPhaseSort:
                 else:
                     write_file.write(data)
                 i += 1
-        write_file.write("\n")
+            write_file.write('\n')
         self.buffer.clear()
         write_file.close()
 
