@@ -16,11 +16,13 @@ class TwoPhaseSort:
         self.buffer = []  # this is used to keep the unsorted data chunk for writing to temp files
         self.col_sizes = []
         self.new_col_sizes = []  # after the reordering of columns is completed
+        self.reverse_dict = OrderedDict()
         self.temp_file_count = 0
         self.record_size = 0
         self.meta_info()
         self.fill_column_list()
         self.calc_record_size()
+        self.reorder_columns()
 
     def meta_info(self):
         """
@@ -57,7 +59,6 @@ class TwoPhaseSort:
             ind += 1
         for name in self.column_name_list:
             self.column_list.append(temp[name])
-        print(self.column_list)
 
     def write_temp_file(self, index):
         """
@@ -66,18 +67,12 @@ class TwoPhaseSort:
         :param index: used for naming the current file by adding index as suffix
         :return: nothing
         """
-        print("writing temp file")
         file_name = "temp" + str(index) + '.txt'
         curr_file = open(file_name, 'w')
         total_columns = len(self.info_file)
-        start = True
         if len(self.buffer) == 0:
             raise NotImplementedError("The buffer size is 0, cannot write to disk")
         for row in self.buffer:
-            if start:
-                start = False
-            else:
-                curr_file.write("\n")
             i = 0
             for data in row:
                 if i == total_columns - 1:
@@ -85,6 +80,7 @@ class TwoPhaseSort:
                 else:
                     curr_file.write(str(data) + "  ")
                 i += 1
+            curr_file.write("\n")
         self.buffer.clear()
         self.temp_file_count += 1
         curr_file.close()
@@ -112,7 +108,6 @@ class TwoPhaseSort:
         for sz in self.col_sizes:
             row_list.append(row[ind: ind + sz])
             ind += sz + 2
-        print(row_list)
         temp = []
         for ind in self.column_list:
             temp.append(row_list[ind])
@@ -121,13 +116,12 @@ class TwoPhaseSort:
             if i not in self.column_list:
                 temp.append(row_list[i])
         temp = tuple(temp)
-        print(temp)
         self.buffer.append(temp)
 
     # TODO: Complete this function
     def reorder_columns(self):
         """
-        reorder the columns sizes, for further help in processing
+        reorder the columns sizes, for final printing in the output file, so that the column order is same as input file
         :return:
         """
         new_order = OrderedDict()
@@ -142,8 +136,10 @@ class TwoPhaseSort:
             if i not in self.column_list:
                 new_order[j] = i
                 j += 1
+
         for key, val in new_order.items():
             self.new_col_sizes.append(self.col_sizes[val])
+            self.reverse_dict[val] = key
 
     def phase_one(self):
         """
@@ -174,22 +170,22 @@ class TwoPhaseSort:
 
     def append_output(self):
         """
-        appends the output_file with the buffer data
+        appends the output_file with the buffer data, change the order as well (restore to initial order)
         :return: nothing
         """
-        print("append file")
         write_file = open(self.output_file, 'a')
         total_columns = len(self.info_file)
-        i = 0
         for row in self.buffer:
-            for data in row:
-                data = data.strip()
+            i = 0
+            for j in range(total_columns):
+                data = row[self.reverse_dict[j]]
                 if i < total_columns - 1:
-                    write_file.write(data + "  ")
+                    write_file.write(str(data) + "  ")
                 else:
                     write_file.write(data)
-            write_file.write('\n')
-            i += 1
+                i += 1
+        write_file.write("\n")
+        self.buffer.clear()
         write_file.close()
 
     def write_one_row_phase_two(self, row):
@@ -199,8 +195,20 @@ class TwoPhaseSort:
         :param row: a string
         :return:
         """
-        temp = tuple(row)
-        self.buffer.append(temp)
+        self.buffer.append(row)
+
+    def give_list(self, row):
+        """
+        it is a substitute for split function, helps in splitting according to column sizes
+        :param row: string which is read from temp files
+        :return: list of row data
+        """
+        row_list = []
+        i = 0
+        for sz in self.new_col_sizes:
+            row_list.append(row[i: i + sz])
+            i += sz + 2
+        return row_list
 
     def phase_two(self):
         """
@@ -213,9 +221,9 @@ class TwoPhaseSort:
 
         for i in range(1, self.temp_file_count + 1):
             temp_files[i] = open('temp' + str(i) + '.txt', 'r')
-            first_line = temp_files[i].readline().strip()
+            first_line = temp_files[i].readline().strip('\n')
             # create a new tuple by appending the index of this file
-            first_list = first_line.split("  ")  # split the line
+            first_list = self.give_list(first_line)  # split the line
             first_list.append(str(i))
             first_line = tuple(first_list)
             temp_list.append(first_line)
@@ -229,18 +237,18 @@ class TwoPhaseSort:
                 self.append_output()
                 written_size = self.record_size
             #  write the record to the output file, read records will be in the new order
-            self.write_one_row_phase_two(tuple(top[:-1]))
-            file_num = int(top[-1])
-            new_line = temp_files[file_num].readline()
+            self.write_one_row_phase_two(tuple(list(top[:-1])))
+            file_num = top[-1]
+            new_line = temp_files[int(file_num)].readline()
+            new_line.strip('\n')
             if new_line:
-                new_line = new_line.strip()
-                new_list = new_line.split("  ")
-                new_list.append(str(file_num))
+                new_list = self.give_list(new_line) # split the line
+                new_list.append(file_num)
                 new_line = tuple(new_list)
                 heapq.heappush(temp_list, new_line)
             else:
-                not_processed[file_num - 1] = 0
-
+                not_processed[int(file_num) - 1] = 0
+        self.append_output()
         # Remember to close the files
         for i in range(1, self.temp_file_count + 1):
             temp_files[i].close()
