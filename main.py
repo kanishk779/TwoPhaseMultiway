@@ -284,6 +284,57 @@ class MyThread(threading.Thread):
         two_phase.phase_two()
 
 
+def give_list(row, new_col_sizes):
+    row_list = []
+    i = 0
+    for sz in new_col_sizes:
+        row_list.append(row[i: i + sz])
+        i += sz + 2
+    return row_list
+
+
+buffer = []
+
+
+def merge_thread_output(num_threads, record_size, new_col_sizes, main_memory):
+    not_processed = [1] * num_threads
+    temp_files = {}
+    temp_list = []
+
+    for i in range(1, num_threads + 1):
+        temp_files[i] = open('./new_data/output' + str(i) + '.txt', 'r')
+        first_line = temp_files[i].readline().strip('\n')
+        # create a new tuple by appending the index of this file
+        first_list = give_list(first_line, new_col_sizes)  # split the line
+        first_list.append(str(i))
+        first_line = tuple(first_list)
+        temp_list.append(first_line)
+
+    heapq.heapify(temp_list)
+    written_size = 0
+    while any(not_processed):
+        top = heapq.heappop(temp_list)
+        written_size += record_size
+        if written_size > main_memory:
+            # self.append_output()
+            written_size = record_size
+        #  write the record to the output file, read records will be in the new order
+        buffer.append(tuple(list(top[:-1])))
+        file_num = top[-1]
+        new_line = temp_files[int(file_num)].readline()
+        new_line.strip('\n')
+        if new_line:
+            new_list = give_list(new_line, new_col_sizes)  # split the line
+            new_list.append(file_num)
+            new_line = tuple(new_list)
+            heapq.heappush(temp_list, new_line)
+        else:
+            not_processed[int(file_num) - 1] = 0
+    # self.append_output()
+    # Remember to close the files
+    for i in range(1, num_threads + 1):
+        temp_files[i].close()
+
 def split_input_file(partitions, input_file_name, main_memory):
     """
     splits the input file when threads are used. Splits the data equally among the threads
@@ -374,6 +425,7 @@ def main():
 
         for t in thread_list:
             t.join()
+
 
 
 if __name__ == '__main__':
