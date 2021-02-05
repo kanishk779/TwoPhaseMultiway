@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 
 class TwoPhaseSort:
-    def __init__(self, input_file, output_file, column_name_list, main_memory, descending, col_sizes, info_file):
+    def __init__(self, input_file, output_file, column_name_list, main_memory, descending, col_sizes, info_file, thread_num=1):
         self.info_file = info_file
         self.input_file = input_file
         self.output_file = output_file
@@ -20,6 +20,7 @@ class TwoPhaseSort:
         self.reverse_dict = OrderedDict()
         self.temp_file_count = 0
         self.record_size = 0
+        self.thread_num = thread_num
         self.fill_column_list()
         self.calc_record_size()
         self.reorder_columns()
@@ -45,7 +46,7 @@ class TwoPhaseSort:
         :param index: used for naming the current file by adding index as suffix
         :return: nothing
         """
-        file_name = "temp" + str(index) + '.txt'
+        file_name = "temp" + str(self.thread_num) + str(index) + '.txt'
         curr_file = open(file_name, 'w')
         total_columns = len(self.info_file)
         if len(self.buffer) == 0:
@@ -151,7 +152,7 @@ class TwoPhaseSort:
         appends the output_file with the buffer data, change the order as well (restore to initial order)
         :return: nothing
         """
-        write_file = open(self.output_file, 'a')
+        write_file = open(self.output_file[:-4] + str(self.thread_num) + '.txt', 'a')
         total_columns = len(self.info_file)
         for row in self.buffer:
             i = 0
@@ -173,7 +174,7 @@ class TwoPhaseSort:
         """
         Fills one row in the buffer in the column order specified by column list. We change the column order in this
         function
-        :param row: a string
+        :param row: a tuple
         :return:
         """
         self.buffer.append(row)
@@ -199,9 +200,12 @@ class TwoPhaseSort:
         not_processed = [1] * self.temp_file_count
         temp_files = {}
         temp_list = []
+        thread_used = False
+        if self.thread_num > 1:
+            thread_used = True
 
         for i in range(1, self.temp_file_count + 1):
-            temp_files[i] = open('temp' + str(i) + '.txt', 'r')
+            temp_files[i] = open('temp' + str(self.thread_num) + str(i) + '.txt', 'r')
             first_line = temp_files[i].readline().strip('\n')
             # create a new tuple by appending the index of this file
             first_list = self.give_list(first_line)  # split the line
@@ -215,7 +219,7 @@ class TwoPhaseSort:
             top = heapq.heappop(temp_list)
             written_size += self.record_size
             if written_size > self.main_memory:
-                self.append_output()
+                self.append_output(thread_used)
                 written_size = self.record_size
             #  write the record to the output file, read records will be in the new order
             self.write_one_row_phase_two(tuple(list(top[:-1])))
