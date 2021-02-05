@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 
 class TwoPhaseSort:
-    def __init__(self, input_file, output_file, column_name_list, main_memory, descending, col_sizes, info_file, thread_num=1):
+    def __init__(self, input_file, output_file, column_name_list, main_memory, descending, col_sizes, info_file, thread_num=1, thread_used=False):
         self.info_file = info_file
         self.input_file = input_file
         self.output_file = output_file
@@ -20,6 +20,7 @@ class TwoPhaseSort:
         self.reverse_dict = OrderedDict()
         self.temp_file_count = 0
         self.record_size = 0
+        self.thread_used = thread_used
         self.thread_num = thread_num
         self.fill_column_list()
         self.calc_record_size()
@@ -200,9 +201,6 @@ class TwoPhaseSort:
         not_processed = [1] * self.temp_file_count
         temp_files = {}
         temp_list = []
-        thread_used = False
-        if self.thread_num > 1:
-            thread_used = True
 
         for i in range(1, self.temp_file_count + 1):
             temp_files[i] = open('temp' + str(self.thread_num) + str(i) + '.txt', 'r')
@@ -219,7 +217,7 @@ class TwoPhaseSort:
             top = heapq.heappop(temp_list)
             written_size += self.record_size
             if written_size > self.main_memory:
-                self.append_output(thread_used)
+                self.append_output(self.thread_used)
                 written_size = self.record_size
             #  write the record to the output file, read records will be in the new order
             self.write_one_row_phase_two(tuple(list(top[:-1])))
@@ -266,9 +264,25 @@ def meta_info():
 
 
 class MyThread(threading.Thread):
-    def __init__(self, thread_id):
+    def __init__(self, thread_num, input_file, output_file, column_name_list, main_memory, desc, col_sizes, info_file):
         threading.Thread.__init__(self)
-        self.thread_id = thread_id
+        self.thread_num = thread_num
+        self.input_file = input_file
+        self.output_file = output_file
+        self.column_name_list = column_name_list
+        self.main_memory = main_memory
+        self.desc = desc
+        self.col_sizes = col_sizes
+        self.info_file = info_file
+
+    def run(self):
+        # first divide the input file equally among the threads and main memory as well
+        two_phase = TwoPhaseSort(input_file=self.input_file, output_file=self.output_file, column_name_list=self.column_name_list,
+                                 descending=self.desc, main_memory=self.main_memory, info_file=self.info_file, col_sizes=self.col_sizes,
+                                 thread_num=self.thread_num, thread_used=True)
+
+        two_phase.phase_one()
+        two_phase.phase_two()
 
 
 def split_input_file(partitions, input_file_name, main_memory):
@@ -307,9 +321,7 @@ def split_input_file(partitions, input_file_name, main_memory):
             new_file.close()
         file_num += 1
     input_file.close()
-
-
-
+    
 
 def main():
     arg_count = len(sys.argv)
@@ -321,7 +333,7 @@ def main():
     main_memory = int(str(sys.argv[3]).strip())
     sorting_type = str(sys.argv[4]).strip()
     column_list = []
-    split_input_file(2, input_file, main_memory)
+
     if 'a' <= sorting_type[0] <= 'z':  # threads are not used
         for i in range(5, arg_count):
             column_list.append(str(sys.argv[i]).strip())
@@ -344,6 +356,18 @@ def main():
         for i in range(6, arg_count):
             column_list.append(str(sys.argv[i]).strip())
         main_memory_per_thread = main_memory // int(num_threads)
+        info_file, col_sizes = meta_info()
+        split_input_file(int(num_threads), input_file, main_memory)
+        thread_list = []
+        for i in range(1, int(num_threads) + 1):
+            i_file = './new_data/' + input_file[:-4] + str(i) + '.txt'
+            o_file = './new_data/' + output_file[:-4] + str(i) + '.txt'
+            curr_thread = MyThread(i, i_file, o_file, column_list, main_memory_per_thread, desc, col_sizes, info_file)
+            curr_thread.start()
+            thread_list.append(curr_thread)
+
+        for t in thread_list:
+            t.join()
 
 
 if __name__ == '__main__':
