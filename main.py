@@ -70,7 +70,8 @@ class TwoPhaseSort:
         """
         temp_sum = 0
         for key, val in self.info_file.items():
-            temp_sum += val
+            temp_sum += val + 2
+        temp_sum -= 1
         self.record_size = temp_sum
         print(self.record_size)
 
@@ -145,7 +146,7 @@ class TwoPhaseSort:
         self.write_temp_file(self.temp_file_count + 1)
         read_file.close()
 
-    def append_output(self):
+    def append_output(self, thread_used=False):
         """
         appends the output_file with the buffer data, change the order as well (restore to initial order)
         :return: nothing
@@ -155,7 +156,10 @@ class TwoPhaseSort:
         for row in self.buffer:
             i = 0
             for j in range(total_columns):
-                data = row[self.reverse_dict[j]]
+                if thread_used:
+                    data = row[j]
+                else:
+                    data = row[self.reverse_dict[j]]
                 if i < total_columns - 1:
                     write_file.write(str(data) + "  ")
                 else:
@@ -263,19 +267,42 @@ class MyThread(threading.Thread):
         self.thread_id = thread_id
 
 
-def split_input_file(partitions, input_file_name):
+def split_input_file(partitions, input_file_name, main_memory):
     total_size = os.stat(input_file_name).st_size  # size of the file in bytes
     _, col_sizes = meta_info()
-    record = 2 * len(col_sizes) - 2
+    record_size = 2 * len(col_sizes) - 2
     for i in col_sizes:
-        record += i
-    record += 1  # 1 is added for accounting newline character
-    num_record = total_size // record
+        record_size += i
+    record_size += 1  # 1 is added for accounting newline character
+    num_record = total_size // record_size
     div = num_record // partitions
     rem = num_record % partitions
     num_record_per_file = [div] * (partitions - 1)
     num_record_per_file.append(div + rem)
-    
+
+    max_possible = main_memory // record_size
+    input_file = open(input_file_name, 'r')
+    os.mkdir('./new_data')
+    file_num = 1
+    for records in num_record_per_file:
+        if max_possible >= records:  # we can read all the records at one go
+            lines = input_file.readlines(records * (record_size - 1))
+            new_file = open('./new_data/input' + str(file_num) + '.txt', 'w')
+            for line in lines:
+                new_file.write(line)
+            new_file.close()
+        else:
+            temp = records
+            new_file = open('./new_data/input' + str(file_num) + '.txt', 'w')
+            while temp > 0:
+                to_read = min(max_possible, temp)
+                lines = input_file.readlines(to_read * (record_size - 1))
+                for line in lines:
+                    new_file.write(line)
+                temp -= to_read
+            new_file.close()
+        file_num += 1
+    input_file.close()
 
 
 
@@ -290,7 +317,7 @@ def main():
     main_memory = int(str(sys.argv[3]).strip())
     sorting_type = str(sys.argv[4]).strip()
     column_list = []
-    split_input_file(2, input_file)
+    split_input_file(2, input_file, main_memory)
     if 'a' <= sorting_type[0] <= 'z':  # threads are not used
         for i in range(5, arg_count):
             column_list.append(str(sys.argv[i]).strip())
