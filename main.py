@@ -148,7 +148,7 @@ class TwoPhaseSort:
         self.write_temp_file(self.temp_file_count + 1)
         read_file.close()
 
-    def append_output(self, thread_used=False):
+    def append_output(self):
         """
         appends the output_file with the buffer data, change the order as well (restore to initial order)
         :return: nothing
@@ -158,7 +158,7 @@ class TwoPhaseSort:
         for row in self.buffer:
             i = 0
             for j in range(total_columns):
-                if thread_used:
+                if self.thread_used:
                     data = row[j]
                 else:
                     data = row[self.reverse_dict[j]]
@@ -217,7 +217,7 @@ class TwoPhaseSort:
             top = heapq.heappop(temp_list)
             written_size += self.record_size
             if written_size > self.main_memory:
-                self.append_output(self.thread_used)
+                self.append_output()
                 written_size = self.record_size
             #  write the record to the output file, read records will be in the new order
             self.write_one_row_phase_two(tuple(list(top[:-1])))
@@ -257,8 +257,7 @@ def meta_info():
             col_size = int(data[1].strip())
             info_file[col_name] = col_size
             col_sizes.append(col_size)
-        print("column sizes : ", end='')
-        print(col_sizes)
+
         meta_file.close()
         return info_file, col_sizes
 
