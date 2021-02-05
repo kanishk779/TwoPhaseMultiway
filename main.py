@@ -1,12 +1,13 @@
 import sys
 import os
 import heapq
+import threading
 from collections import OrderedDict
 
 
 class TwoPhaseSort:
-    def __init__(self, input_file, output_file, column_name_list, main_memory, descending):
-        self.info_file = OrderedDict()
+    def __init__(self, input_file, output_file, column_name_list, main_memory, descending, col_sizes, info_file):
+        self.info_file = info_file
         self.input_file = input_file
         self.output_file = output_file
         self.column_name_list = column_name_list  # list of names which represent the order of columns
@@ -14,37 +15,14 @@ class TwoPhaseSort:
         self.main_memory = main_memory
         self.descending = descending
         self.buffer = []  # this is used to keep the unsorted data chunk for writing to temp files
-        self.col_sizes = []
+        self.col_sizes = col_sizes
         self.new_col_sizes = []  # after the reordering of columns is completed
         self.reverse_dict = OrderedDict()
         self.temp_file_count = 0
         self.record_size = 0
-        self.meta_info()
         self.fill_column_list()
         self.calc_record_size()
         self.reorder_columns()
-
-    def meta_info(self):
-        """
-        Reads the metadata.txt file to read in the schema of the table containing the records.
-        """
-        try:
-            meta_file = open('metadata1.txt', 'r')
-        except FileNotFoundError:
-            print('metadata.txt not found')
-        else:
-            for line in meta_file.readlines():
-                line = line.strip()
-                data = line.split(',')
-                if len(data) != 2:
-                    raise NotImplementedError("metadata.txt is not in correct format")
-                col_name = data[0].strip()
-                col_size = int(data[1].strip())
-                self.info_file[col_name] = col_size
-                self.col_sizes.append(col_size)
-            print("column sizes : ", end='')
-            print(self.col_sizes)
-            meta_file.close()
 
     def fill_column_list(self):
         """
@@ -147,7 +125,6 @@ class TwoPhaseSort:
         :return: nothing
         """
         read_file = open(self.input_file, 'r')
-        total_size = os.stat(self.input_file).st_size  # size of the file in bytes
         processed_size = 0
         while True:
             row = read_file.readline()
@@ -254,6 +231,55 @@ class TwoPhaseSort:
             temp_files[i].close()
 
 
+def meta_info():
+    """
+    Reads the metadata.txt file to read in the schema of the table containing the records.
+    """
+    try:
+        meta_file = open('metadata.txt', 'r')
+    except FileNotFoundError:
+        print('metadata.txt not found')
+    else:
+        info_file = OrderedDict()
+        col_sizes = []
+        for line in meta_file.readlines():
+            line = line.strip()
+            data = line.split(',')
+            if len(data) != 2:
+                raise NotImplementedError("metadata.txt is not in correct format")
+            col_name = data[0].strip()
+            col_size = int(data[1].strip())
+            info_file[col_name] = col_size
+            col_sizes.append(col_size)
+        print("column sizes : ", end='')
+        print(col_sizes)
+        meta_file.close()
+        return info_file, col_sizes
+
+
+class MyThread(threading.Thread):
+    def __init__(self, thread_id):
+        threading.Thread.__init__(self)
+        self.thread_id = thread_id
+
+
+def split_input_file(partitions, input_file_name):
+    total_size = os.stat(input_file_name).st_size  # size of the file in bytes
+    _, col_sizes = meta_info()
+    record = 2 * len(col_sizes) - 2
+    for i in col_sizes:
+        record += i
+    record += 1  # 1 is added for accounting newline character
+    num_record = total_size // record
+    div = num_record // partitions
+    rem = num_record % partitions
+    num_record_per_file = [div] * (partitions - 1)
+    num_record_per_file.append(div + rem)
+    
+
+
+
+
 def main():
     arg_count = len(sys.argv)
     if arg_count < 5:
@@ -264,16 +290,29 @@ def main():
     main_memory = int(str(sys.argv[3]).strip())
     sorting_type = str(sys.argv[4]).strip()
     column_list = []
-    for i in range(5, arg_count):
-        column_list.append(str(sys.argv[i]).strip())
-    desc = False
-    if sorting_type == "desc":
-        desc = True
-    two_phase = TwoPhaseSort(input_file=input_file, output_file=output_file, column_name_list=column_list,
-                             descending=desc, main_memory=main_memory)
+    split_input_file(2, input_file)
+    if 'a' <= sorting_type[0] <= 'z':  # threads are not used
+        for i in range(5, arg_count):
+            column_list.append(str(sys.argv[i]).strip())
+        desc = False
+        if sorting_type == "desc":
+            desc = True
+        info_file, col_sizes = meta_info()
+        # first divide the input file equally among the threads and main memory as well
+        two_phase = TwoPhaseSort(input_file=input_file, output_file=output_file, column_name_list=column_list,
+                                 descending=desc, main_memory=main_memory, info_file=info_file, col_sizes= col_sizes)
 
-    two_phase.phase_one()
-    two_phase.phase_two()
+        two_phase.phase_one()
+        two_phase.phase_two()
+    else:
+        num_threads = sorting_type
+        sorting_type = str(sys.argv[5]).strip()
+        desc = False
+        if sorting_type == "desc":
+            desc = True
+        for i in range(6, arg_count):
+            column_list.append(str(sys.argv[i]).strip())
+        main_memory_per_thread = main_memory // int(num_threads)
 
 
 if __name__ == '__main__':
