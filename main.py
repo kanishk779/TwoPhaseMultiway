@@ -2,6 +2,7 @@ import sys
 import os
 import heapq
 import threading
+import copy
 from collections import OrderedDict
 
 
@@ -47,7 +48,7 @@ class TwoPhaseSort:
         :param index: used for naming the current file by adding index as suffix
         :return: nothing
         """
-        file_name = "temp" + str(self.thread_num) + str(index) + '.txt'
+        file_name = "./new_data/temp" + str(self.thread_num) + str(index) + '.txt'
         curr_file = open(file_name, 'w')
         total_columns = len(self.info_file)
         if len(self.buffer) == 0:
@@ -203,7 +204,7 @@ class TwoPhaseSort:
         temp_list = []
 
         for i in range(1, self.temp_file_count + 1):
-            temp_files[i] = open('temp' + str(self.thread_num) + str(i) + '.txt', 'r')
+            temp_files[i] = open('./new_data/temp' + str(self.thread_num) + str(i) + '.txt', 'r')
             first_line = temp_files[i].readline().strip('\n')
             # create a new tuple by appending the index of this file
             first_list = self.give_list(first_line)  # split the line
@@ -284,28 +285,48 @@ class MyThread(threading.Thread):
         two_phase.phase_two()
 
 
-def give_list(row, new_col_sizes):
+buffer = []
+OUTPUT_FILE_NAME = ""
+TOTAL_COLUMNS = 1
+REVERSE_DICT = OrderedDict()
+NEW_COL_SIZES = []
+
+
+def give_list(row):
     row_list = []
     i = 0
-    for sz in new_col_sizes:
+    for sz in NEW_COL_SIZES:
         row_list.append(row[i: i + sz])
         i += sz + 2
     return row_list
 
 
-buffer = []
+def append_output():
+    write_file = open(OUTPUT_FILE_NAME, 'a')
+    for row in buffer:
+        i = 0
+        for j in range(TOTAL_COLUMNS):
+            data = row[REVERSE_DICT[j]]
+            if i < TOTAL_COLUMNS - 1:
+                write_file.write(str(data) + "  ")
+            else:
+                write_file.write(data)
+            i += 1
+        write_file.write('\n')
+    buffer.clear()
+    write_file.close()
 
 
-def merge_thread_output(num_threads, record_size, new_col_sizes, main_memory):
+def merge_thread_output(num_threads, record_size, main_memory):
     not_processed = [1] * num_threads
     temp_files = {}
     temp_list = []
 
     for i in range(1, num_threads + 1):
-        temp_files[i] = open('./new_data/output' + str(i) + '.txt', 'r')
+        temp_files[i] = open('./new_data/output' + str(i) + str(i) + '.txt', 'r')
         first_line = temp_files[i].readline().strip('\n')
         # create a new tuple by appending the index of this file
-        first_list = give_list(first_line, new_col_sizes)  # split the line
+        first_list = give_list(first_line)  # split the line
         first_list.append(str(i))
         first_line = tuple(first_list)
         temp_list.append(first_line)
@@ -316,7 +337,7 @@ def merge_thread_output(num_threads, record_size, new_col_sizes, main_memory):
         top = heapq.heappop(temp_list)
         written_size += record_size
         if written_size > main_memory:
-            # self.append_output()
+            append_output()
             written_size = record_size
         #  write the record to the output file, read records will be in the new order
         buffer.append(tuple(list(top[:-1])))
@@ -324,16 +345,17 @@ def merge_thread_output(num_threads, record_size, new_col_sizes, main_memory):
         new_line = temp_files[int(file_num)].readline()
         new_line.strip('\n')
         if new_line:
-            new_list = give_list(new_line, new_col_sizes)  # split the line
+            new_list = give_list(new_line)  # split the line
             new_list.append(file_num)
             new_line = tuple(new_list)
             heapq.heappush(temp_list, new_line)
         else:
             not_processed[int(file_num) - 1] = 0
-    # self.append_output()
+    append_output()
     # Remember to close the files
     for i in range(1, num_threads + 1):
         temp_files[i].close()
+
 
 def split_input_file(partitions, input_file_name, main_memory):
     """
@@ -390,6 +412,10 @@ def main():
     main_memory = int(str(sys.argv[3]).strip())
     sorting_type = str(sys.argv[4]).strip()
     column_list = []
+    global OUTPUT_FILE_NAME
+    global TOTAL_COLUMNS
+    global REVERSE_DICT
+    global NEW_COL_SIZES
 
     if 'a' <= sorting_type[0] <= 'z':  # threads are not used
         for i in range(5, arg_count):
@@ -414,8 +440,15 @@ def main():
             column_list.append(str(sys.argv[i]).strip())
         main_memory_per_thread = main_memory // int(num_threads)
         info_file, col_sizes = meta_info()
+        two_phase = TwoPhaseSort(input_file=input_file, output_file=output_file, column_name_list=column_list,
+                                 descending=desc, main_memory=main_memory, info_file=info_file, col_sizes=col_sizes)
+        OUTPUT_FILE_NAME = output_file
+        REVERSE_DICT = two_phase.reverse_dict
+        NEW_COL_SIZES = copy.deepcopy(two_phase.new_col_sizes)
+        TOTAL_COLUMNS = len(NEW_COL_SIZES)
         split_input_file(int(num_threads), input_file, main_memory)
         thread_list = []
+
         for i in range(1, int(num_threads) + 1):
             i_file = './new_data/' + input_file[:-4] + str(i) + '.txt'
             o_file = './new_data/' + output_file[:-4] + str(i) + '.txt'
@@ -426,6 +459,10 @@ def main():
         for t in thread_list:
             t.join()
 
+        record_size = 2 * len(col_sizes) - 1
+        for sz in col_sizes:
+            record_size += sz
+        merge_thread_output(int(num_threads), record_size, int(main_memory))
 
 
 if __name__ == '__main__':
