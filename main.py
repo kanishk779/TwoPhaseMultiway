@@ -286,6 +286,13 @@ class MyThread(threading.Thread):
 
 
 def split_input_file(partitions, input_file_name, main_memory):
+    """
+    splits the input file when threads are used. Splits the data equally among the threads
+    :param partitions: number of partitions to be created
+    :param input_file_name: input_file
+    :param main_memory: maximum main memory that can be used
+    :return: nothing
+    """
     total_size = os.stat(input_file_name).st_size  # size of the file in bytes
     _, col_sizes = meta_info()
     record_size = 2 * len(col_sizes) - 2
@@ -321,7 +328,7 @@ def split_input_file(partitions, input_file_name, main_memory):
             new_file.close()
         file_num += 1
     input_file.close()
-    
+
 
 def main():
     arg_count = len(sys.argv)
