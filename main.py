@@ -76,7 +76,6 @@ class TwoPhaseSort:
             temp_sum += val + 2
         temp_sum -= 1
         self.record_size = temp_sum
-        print(self.record_size)
 
     def write_one_row(self, row):
         """
@@ -318,6 +317,13 @@ def append_output():
 
 
 def merge_thread_output(num_threads, record_size, main_memory):
+    """
+    merge the individual output of threads into one output file
+    :param num_threads:
+    :param record_size:
+    :param main_memory:
+    :return:
+    """
     not_processed = [1] * num_threads
     temp_files = {}
     temp_list = []
@@ -379,7 +385,9 @@ def split_input_file(partitions, input_file_name, main_memory):
 
     max_possible = main_memory // record_size
     input_file = open(input_file_name, 'r')
-    os.mkdir('./new_data')
+    if not os.path.isdir('./new_data'):
+        os.mkdir('./new_data')
+
     file_num = 1
     for records in num_record_per_file:
         if max_possible >= records:  # we can read all the records at one go
