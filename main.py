@@ -3,6 +3,7 @@ import os
 import heapq
 import threading
 import copy
+import time
 from collections import OrderedDict
 
 
@@ -127,6 +128,7 @@ class TwoPhaseSort:
         Phase one sorts the data by dividing it into chunks, and write them back to disk, readlines() should not be used
         :return: nothing
         """
+        print('Phase one started by thread {a}'.format(a=self.thread_num))
         read_file = open(self.input_file, 'r')
         processed_size = 0
         while True:
@@ -147,6 +149,7 @@ class TwoPhaseSort:
             self.buffer.reverse()
         self.write_temp_file(self.temp_file_count + 1)
         read_file.close()
+        print('Phase one end for thread {a}'.format(a=self.thread_num))
 
     def append_output(self):
         """
@@ -198,6 +201,7 @@ class TwoPhaseSort:
         Phase two of two phase multi-way merge-sort
         :return: nothing
         """
+        print('Phase two started by thread {a}'.format(a=self.thread_num))
         not_processed = [1] * self.temp_file_count
         temp_files = {}
         temp_list = []
@@ -235,6 +239,8 @@ class TwoPhaseSort:
         # Remember to close the files
         for i in range(1, self.temp_file_count + 1):
             temp_files[i].close()
+
+        print('Phase two end for thread {a}'.format(a=self.thread_num))
 
 
 def meta_info():
@@ -371,6 +377,7 @@ def split_input_file(partitions, input_file_name, main_memory):
     :param main_memory: maximum main memory that can be used
     :return: nothing
     """
+    print('File splitting started')
     total_size = os.stat(input_file_name).st_size  # size of the file in bytes
     _, col_sizes = meta_info()
     record_size = 2 * len(col_sizes) - 2
@@ -406,6 +413,7 @@ def split_input_file(partitions, input_file_name, main_memory):
             new_file.close()
         file_num += 1
     input_file.close()
+    print('File splitting end')
 
 
 def main():
@@ -425,7 +433,7 @@ def main():
 
     if not os.path.isdir('./new_data'):
         os.mkdir('./new_data')
-        
+    t0 = time.time()
     if 'a' <= sorting_type[0] <= 'z':  # threads are not used
         for i in range(5, arg_count):
             column_list.append(str(sys.argv[i]).strip())
@@ -459,6 +467,7 @@ def main():
         thread_list = []
 
         for i in range(1, int(num_threads) + 1):
+            print('thread {a} started '.format(a=i))
             i_file = './new_data/' + input_file[:-4] + str(i) + '.txt'
             o_file = './new_data/' + output_file[:-4] + str(i) + '.txt'
             curr_thread = MyThread(i, i_file, o_file, column_list, main_memory_per_thread, desc, col_sizes, info_file)
@@ -471,7 +480,11 @@ def main():
         record_size = 2 * len(col_sizes) - 1
         for sz in col_sizes:
             record_size += sz
+        print('merging output of individual threads')
         merge_thread_output(int(num_threads), record_size, int(main_memory))
+
+    t_f = time.time()
+    print(t_f - t0)
 
 
 if __name__ == '__main__':
