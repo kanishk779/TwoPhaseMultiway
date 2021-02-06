@@ -433,6 +433,21 @@ def main():
 
     if not os.path.isdir('./new_data'):
         os.mkdir('./new_data')
+    total_size = os.stat(input_file).st_size
+    div = (total_size + int(main_memory) - 1) // int(main_memory)
+
+    info_file, col_sizes = meta_info()
+    record_size = 0
+    for key, val in info_file.items():
+        record_size += val + 2
+    record_size -= 1
+
+    max_records = int(main_memory) // record_size
+    if div < max_records:
+        print(div)
+        print(max_records)
+        raise NotImplementedError('This sorting is not feasible')
+
     t0 = time.time()
     if 'a' <= sorting_type[0] <= 'z':  # threads are not used
         for i in range(5, arg_count):
@@ -440,7 +455,7 @@ def main():
         desc = False
         if sorting_type == "desc":
             desc = True
-        info_file, col_sizes = meta_info()
+
         # first divide the input file equally among the threads and main memory as well
         two_phase = TwoPhaseSort(input_file=input_file, output_file=output_file, column_name_list=column_list,
                                  descending=desc, main_memory=main_memory, info_file=info_file, col_sizes= col_sizes)
@@ -456,7 +471,7 @@ def main():
         for i in range(6, arg_count):
             column_list.append(str(sys.argv[i]).strip())
         main_memory_per_thread = main_memory // int(num_threads)
-        info_file, col_sizes = meta_info()
+
         two_phase = TwoPhaseSort(input_file=input_file, output_file=output_file, column_name_list=column_list,
                                  descending=desc, main_memory=main_memory, info_file=info_file, col_sizes=col_sizes)
         OUTPUT_FILE_NAME = output_file
