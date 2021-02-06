@@ -443,7 +443,7 @@ def main():
     record_size -= 1
 
     max_records = int(main_memory) // record_size
-    if div < max_records:
+    if div >= max_records:
         print(div)
         print(max_records)
         raise NotImplementedError('This sorting is not feasible')
