@@ -392,6 +392,8 @@ def split_input_file(partitions, input_file_name, main_memory):
 
     max_possible = main_memory // record_size
     input_file = open(input_file_name, 'r')
+    if not os.path.isdir('./new_data'):
+        os.mkdir('./new_data')
 
     file_num = 1
     for records in num_record_per_file:
